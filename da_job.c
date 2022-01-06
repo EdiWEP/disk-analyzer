@@ -37,7 +37,7 @@ void outputDirectory(int level){
         if(level == 0) fprintf(fp, "Path \t\t Usage \t Size \t Amount\n");
         if(level == 1) fprintf(fp, "|\n");
         if(level >= 1) fprintf(fp ,"|-");
-        
+
         fprintf(fp, "%s: %0.2f %s, %0.2f%% ", path, printSize, type, percent);
 
         fprintf(fp, "[");
@@ -125,7 +125,7 @@ int func(const char* fpath, const struct stat* sb, int typeflag, struct FTW* ftw
 
 void SendStatus(int sig) {
 
-    PROGRESS = (doneFiles + doneDirectories) / (totalFiles + totalDirectories) * 100;
+    PROGRESS = 100 * (doneFiles + doneDirectories) / (totalFiles + totalDirectories);
     FILE* fp = fopen(statusPath, "w");
     fprintf(fp, "%s\n, %d", STATUS, PROGRESS);
     fclose(fp);
