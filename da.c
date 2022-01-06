@@ -8,8 +8,8 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
-#define DAEMON_PATH "File_Info/daemon_pid.txt"
-#define INSTRUCTION_PATH "File_Info/daemon_instructions.txt"
+#define DAEMON_PATH "/tmp/dad/daemon_pid.txt"
+#define INSTRUCTION_PATH "/tmp/dad/daemon_instructions.txt"
 
 #define ADD 1
 #define PRIORITY 2
@@ -93,7 +93,6 @@ int main(int argc, char **argv)
             }
 
             sprintf(instruction,"Instruction - %d\nPriority - %d\nPath - %s\nDA_Pid - %d\n",ADD,priority,dirPath,getpid());
-            write_in_file(instruction);
             break;
 
         case SUSPEND:
@@ -103,8 +102,7 @@ int main(int argc, char **argv)
             }
 
             id = atoi(argv[2]);
-            sprintf(instruction,"Instruction - %d\nId - %d\n,DA_Pid - %d\n",SUSPEND,id,getpid());
-            write_in_file(instruction);
+            sprintf(instruction,"Instruction - %d\nId - %d\nDA_Pid - %d\n",SUSPEND,id,getpid());
             break;
 
         case RESUME:
@@ -114,8 +112,7 @@ int main(int argc, char **argv)
             }
 
             id = atoi(argv[2]);
-
-            //trebuie sa trimit instructiunile
+            sprintf(instruction,"Instruction - %d\nId - %d\nDA_Pid - %d\n",RESUME,id,getpid());
             break;
         
         case REMOVE:
@@ -125,7 +122,7 @@ int main(int argc, char **argv)
             }
 
             id = atoi(argv[2]);
-
+            sprintf(instruction,"Instruction - %d\nId - %d\nDA_Pid - %d\n",REMOVE,id,getpid());
             break;
         
         case INFO:
@@ -135,7 +132,7 @@ int main(int argc, char **argv)
             }
 
             id = atoi(argv[2]);
-
+            sprintf(instruction,"Instruction - %d\nId - %d\nDA_Pid - %d\n",INFO,id,getpid());
             break;
         
         case PRINT:
@@ -145,11 +142,16 @@ int main(int argc, char **argv)
             }
 
             id = atoi(argv[2]);
-
+            sprintf(instruction,"Instruction - %d\nId - %d\nDA_Pid - %d\n",PRINT,id,getpid());
             break;
         
         case LIST_ALL:
+            if(argc != 2){
+                printf("Wrong number of arguments.");
+                return -1;
+            }
 
+            sprintf(instruction,"Instruction - %d\nDA_Pid - %d\n",LIST_ALL,id,getpid());
             break;
 
         case HELP:
@@ -171,5 +173,7 @@ int main(int argc, char **argv)
             printf("Invalid instruction");
         }
     
+    write_in_file(instruction);
+
     return 0;
 }
