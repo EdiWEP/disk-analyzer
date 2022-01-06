@@ -7,24 +7,12 @@
 #include <error.h>
 #include <stdlib.h>
 #include <stdarg.h>
-
-#define DAEMON_PATH "/tmp/dad/daemon_pid.txt"
-#define INSTRUCTION_PATH "/tmp/dad/daemon_instructions.txt"
-
-#define ADD 1
-#define PRIORITY 2
-#define SUSPEND 3
-#define RESUME 4
-#define REMOVE 5
-#define INFO 6
-#define PRINT 7
-#define LIST_ALL 8
-#define HELP 10
+#include "da_variables.h"
 
 int get_daemon_pid()
 {
     int d_pid;
-    FILE* fptr = fopen(DAEMON_PATH,"r");
+    FILE* fptr = fopen(DAEMON_PID_PATH,"r");
     if(fptr == NULL){
         printf("Error: Could not open Daemon Pid file");
         return -1;
@@ -151,7 +139,7 @@ int main(int argc, char **argv)
                 return -1;
             }
 
-            sprintf(instruction,"Instruction - %d\nDA_Pid - %d\n",LIST_ALL,id,getpid());
+            sprintf(instruction,"Instruction - %d\nDA_Pid - %d\n",LIST_ALL,getpid());
             break;
 
         case HELP:
