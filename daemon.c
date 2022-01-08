@@ -206,7 +206,7 @@ void commandHandler(int signal) {
     char id[3];
     char path[512];
     int callerPid;
-    int idProcess;
+    int processId;
 
     switch(code) {
 
@@ -269,61 +269,104 @@ void commandHandler(int signal) {
         	break;
 
         case SUSPEND: 
-            fscanf(fpi, "%d", &idProcess);
+            fscanf(fpi, "%d", &processId);
         	fscanf(fpi, "%d", &callerPid);
-            
-            if(active[idProcess] == 0){
-                fprintf(outfp, "0\nError: The job doesn't exist.\n");
+
+            if(active[processId] == 0){
+                fprintf(outfp, "0\nError: The job doesn't exist\n");
                
                 break;
             }
 
-            if(*status[idProcess] == 's'){
-                fprintf(outfp, "0\nError: The job is already suspended.\n");
+            if(*status[processId] == 's'){
+                fprintf(outfp, "0\nError: The job is already suspended\n");
 
                 break;
             }
 
-            *status[idProcess] = 's';
-            kill(SIGSTOP, jobPid[idProcess]);
+            fprintf(outfp, "0\nJob suspended successfully\nID = %d\nDirectory = %s\n", processId, paths[processId]);
+
+            *status[processId] = 's';
+            kill(SIGSTOP, jobPid[processId]);
 
         	break;
         
         case RESUME: 
-            fscanf(fpi, "%d", &idProcess);
+            fscanf(fpi, "%d", &processId);
         	fscanf(fpi, "%d", &callerPid);
 
-            if(active[idProcess] == 0){
-                fprintf(outfp, "0\nError: The job doesn't exist.\n");
+            if(active[processId] == 0){
+                fprintf(outfp, "0\nError: The job doesn't exist\n");
                
                 break;
             }
 
-            if(*status[idProcess] != 's'){
-                fprintf(outfp, "0\nError: The job is already executing.\n");
+            if(*status[processId] != 's'){
+                fprintf(outfp, "0\nError: The job is already executing\n");
 
                 break;
             }
 
-            *status[idProcess] = previousStatus[idProcess];
-            kill(SIGCONT, jobPid[idProcess]);
+            fprintf(outfp, "0\nJob resumed successfully\nID = %d\nDirectory = %s\n", processId, paths[processId]);
+
+            *status[processId] = previousStatus[processId];
+            kill(SIGCONT, jobPid[processId]);
+
         	break;
         
         case REMOVE:
-            fscanf(fpi, "%d", &idProcess);
+            fscanf(fpi, "%d", &processId);
         	fscanf(fpi, "%d", &callerPid);
+
+            if(active[processId] == 0){
+                fprintf(outfp, "0\nError: The job doesn't exist\n");
+               
+                break;
+            }
+
+            char statusWord[16];
+            char currentStatus = *status[processId];
+
+            switch (currentStatus){
+                case 'i': strcpy(statusWord, "PREPARING"); break;
+
+                case 'r': strcpy(statusWord, "IN PROGRESS"); break;
+
+                case 'd': strcpy(statusWord, "DONE"); break;
+
+                case 's': strcpy(statusWord, "SUSPENDED"); break;
+                }
+
+            fprintf(outfp, "0\nJob removed successfully\nID = %d\nDirectory = %s\nStatus = %s\n", processId, paths[processId], statusWord);
+            
+            active[processId] == 0;
+            kill(SIGTERM, jobPid[processId]);
 
         	break;
 
         case INFO: 
-            fscanf(fpi, "%d", &idProcess);
+            fscanf(fpi, "%d", &processId);
         	fscanf(fpi, "%d", &callerPid);
 
         	break;
 
         case PRINT: 
-            fscanf(fpi, "%d", &idProcess);
+            fscanf(fpi, "%d", &processId);
         	fscanf(fpi, "%d", &callerPid);
+
+            if(active[processId] == 0){
+                fprintf(outfp, "0\nError: The job doesn't exist\n");
+               
+                break;
+            }
+
+            if(*status[processId] != 'd'){
+                fprintf(outfp, "0\nError: The job isn't done\n");
+
+                break;
+            }
+
+            fprintf(outfp, "%d", processId);
 
         	break;
         
