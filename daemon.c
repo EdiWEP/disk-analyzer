@@ -15,14 +15,13 @@
 
 int activeWorkers = 0;
 int active[MAX_TASKS+1];
-
+char* paths[MAX_TASKS+1];
 
 FILE* logfp;
 int workerShmFd;
 void* workerData;
 // 1b[status]1b[percent]4b[doneFiles]4b[totalDirs] | next job | ...
 
-char* paths[MAX_TASKS+1];
 char** status; 
 char** progress;
 int** doneFiles;
