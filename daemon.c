@@ -14,16 +14,18 @@
 #define MAX_TASKS 10
 
 int activeWorkers = 0;
+int active[MAX_TASKS+1];
+
 
 FILE* logfp;
 int workerShmFd;
 void* workerData;
-// 1b[status]1b[percent]4b[totalFiles]4b[totalDirs] | next job | ...
+// 1b[status]1b[percent]4b[doneFiles]4b[totalDirs] | next job | ...
 
 char** status; 
 char** progress;
-int** totalFiles;
-int** totalDirectories;
+int** doneFiles;
+int** doneDirectories;
 // job statuses
 // i -> preparing / initialization stage
 // r -> in progress / running
@@ -47,7 +49,6 @@ void becomeDaemon() {
     // on success: The child process becomes session leader
     if (setsid() < 0)
         exit(EXIT_FAILURE);
-
 
     // fork off for the second time
     pid = fork();
@@ -102,14 +103,20 @@ void openLogs() {
 
     logfp = fopen(LOG_PATH, "w");
 }
+
 void stop(int signal) {
 
     fclose(logfp);
+
+    munmap(workerData, getpagesize());
+    close(shm_fd);
+    shm_unlink(WORKER_SHM_NAME);
+
     exit(0);
 }
 
 void setupSharedMem() {
-    workerShmFd = shm_open("dskanl_shm", O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
+    workerShmFd = shm_open(WORKER_SHM_NAME, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
 
     if (workerShmFd < 0) {
         fprintf(stderr, "Error: Failed to open shared memory");
@@ -130,15 +137,15 @@ void setupSharedMem() {
 
     status = malloc(sizeof(char*) * (MAX_TASKS+1));
     progress = malloc(sizeof(char*) * (MAX_TASKS+1));
-    totalFiles = malloc(sizeof(int*) * (MAX_TASKS+1));
-    totalDirectories = malloc(sizeof(char*) * (MAX_TASKS+1)); 
+    doneFiles = malloc(sizeof(int*) * (MAX_TASKS+1));
+    doneDirectories = malloc(sizeof(char*) * (MAX_TASKS+1)); 
 
 
     for(int i = 1; i <= MAX_TASKS; ++i) {
         status[i] = (char*) (workerData + (i-1)*10);
         progress[i] = (char*) (workerData + (i-1)*10 +1);
-        totalFiles[i] = (int*) (workerData + (i-1)*10 + 2);
-        totalDirectories[i] = (int*) (workerData + (i-1)*10 + 6);
+        doneFiles[i] = (int*) (workerData + (i-1)*10 + 2);
+        doneDirectories[i] = (int*) (workerData + (i-1)*10 + 6);
          
     }
 }
@@ -147,7 +154,14 @@ void setupSharedMem() {
 
 int firstFreeId(){
 
-    return 1;
+    int newId;
+    for(int i = 1; i <= MAX_TASKS; ++i) {
+        if(!active[i]) {
+            return newId; 
+        }
+    }
+
+    return -1;
 }
 
 void commandHandler(int signal) {
@@ -161,11 +175,7 @@ void commandHandler(int signal) {
 
         case ADD: 
 
-            int newId = firstFreeId();
-
-            if(newId > MAX_TASKS) {
-                // output an error
-            }
+            FILE* outfp = fopen(DAEMON_OUTPUT_PATH, "w");
 
             char id[3];
             char path[512];
@@ -179,11 +189,22 @@ void commandHandler(int signal) {
             fscanf(fpi, "%s", path);
             fscanf(fpi, "%d", &callerPid);
 
+            int newId = firstFreeId();
+
+            if(newId == -1) {
+                fprintf(outfp, "Error: Couldn't start new job.\nReason: Maximum amount(%d) of jobs reached.\nUse -r to remove jobs.", MAX_TASKS);
+            
+                fclose(outfp);
+                kill(callerPid, SIGUSR1);
+                break;
+            }
+
             ++activeWorkers;
+            active[newId] = 1;
             *status[newId] = 'i';
             *progress[newId] = 0;
-            *totalFiles[newId] = 0;
-            *totalDirectories[newId] = 0;     
+            *doneFiles[newId] = 0;
+            *doneDirectories[newId] = 0;     
 
             char* argv[] = {"diskanalyzer_job", path, id, prio, NULL};
             int pid = fork();
@@ -192,10 +213,10 @@ void commandHandler(int signal) {
                 execve(DISKANALYZER_JOB_PATH, argv, NULL);
             }
 
-            FILE* outfp = fopen(DAEMON_OUTPUT_PATH, "w");
-            fprintf(outfp, "0\nStarted new analysis job\nID = %d\nDirectory = %s\n", newId, path);
-            fclose(outfp);
 
+            fprintf(outfp, "0\nStarted new analysis job\nID = %d\nDirectory = %s\n", newId, path);
+            
+            fclose(outfp);
             kill(callerPid, SIGUSR1); 
 
         break;
