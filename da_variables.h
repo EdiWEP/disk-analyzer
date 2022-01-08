@@ -7,6 +7,8 @@
 #define JOBS_FOLDER_PATH "/tmp/dad/jobs/"
 #define STATUS_FOLDER_PATH "/tmp/dad/status/"
 
+#define WORKER_SHM_NAME "dskanl_shm"
+
 #define ADD 1
 #define PRIORITY 2
 #define SUSPEND 3
