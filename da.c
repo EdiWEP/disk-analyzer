@@ -11,7 +11,7 @@
 #include <stdbool.h>
 #include <errno.h>
 #include <sys/stat.h>
-
+#include <dirent.h>
 #include "da_variables.h"
 
 
@@ -114,17 +114,12 @@ int sendCommand() {
 void getResponse(int signal) {
 
     int responseCode;
-    bool readJob = false;
     char line[1024];
 
     FILE* fp = fopen(DAEMON_OUTPUT_PATH, "r");
     fscanf(fp, "%d", &responseCode);
 
     if(responseCode > 0) {
-        readJob = true;
-    }
-
-    if(readJob) {
         fclose(fp);
         char outputPath[32];
         char code[5];
@@ -144,8 +139,8 @@ void getResponse(int signal) {
         while(fread(line, 1, 1024, fp)) {
             printf("%s\n", line);
         }
-        
     }
+
     fclose(fp);
     
     exit(0);
@@ -156,6 +151,25 @@ void initialize() {
     daemonPID = getDaemonPid();
     processPID = getpid();
     signal(SIGUSR1, getResponse);
+}
+
+//returns 0 if argument is valid, -1 otherwise
+bool getNumericArgument(char *argv[], int *variable, int index){
+
+    char * inputcheck;
+
+    *variable = (int) strtol(argv[index], &inputcheck, 10);
+                
+    //check if argument given is a number
+    if(*inputcheck != '\0'){
+        if(index == 4)
+            fprintf(stderr, "Error: Priority must be numeric.\n");
+        else if(index == 2)
+            fprintf(stderr, "Error: Identifier must be numeric.\n");
+        return -1;
+    }
+
+    return 0;
 }
 
 int main(int argc, char *argv[])
@@ -180,7 +194,6 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-
     initialize();
 
     switch (option)
@@ -189,45 +202,78 @@ int main(int argc, char *argv[])
             
             int priority = 1;
             char* dirPath = argv[2];
-            
+
+            //check if path was given
+            if(argc == 2){
+                fprintf(stderr, "Error: -a requires an argument(path).\n");
+                return -1;
+            }
+
+            //check if path is valid
+            DIR* checkDirectory = opendir(dirPath);
+            if(ENOENT == errno){
+                fprintf(stderr, "Error: Invalid or inexistent path.\n");
+                return -1;
+            }
+            closedir(checkDirectory);
+
+            //if priority exists, get data
             if(argc == 5 && getOption(argv[3], argc) == PRIORITY){
 
-                priority = atoi(argv[4]);
-                if(priority > 3) priority = 3;
-                else if (priority < 1) priority = 1;
+                //get priority argument and check if it is numeric
+                if(getNumericArgument(argv, &priority, 4))
+                    return -1;
 
+                if(priority > 3){ 
+                    priority = 3;
+                    printf("Warning: Priority was set to maximum of 3.\n");
+                }
+                else if (priority < 1){ 
+                    priority = 1;
+                    printf("Warning: Priority was set to minimum of 1.\n");
+                    }
             }
 
             sprintf(instruction,"%d\n%d\n%s\n%d\n", ADD, priority, dirPath, processPID);
             break;
 
         case SUSPEND:
+            //get identifier argument and check if it is numeric
+            if(getNumericArgument(argv, &id, 2))
+                    return -1;
 
-            id = atoi(argv[2]);
             sprintf(instruction,"%d\n%d\n%d\n", SUSPEND, id, processPID);
             break;
 
         case RESUME:
-           
-            id = atoi(argv[2]);
+           //get identifier argument and check if it is numeric
+            if(getNumericArgument(argv, &id, 2))
+                    return -1;
+
             sprintf(instruction,"%d\n%d\n%d\n", RESUME, id, processPID);
             break;
         
         case REMOVE:
+            //get identifier argument and check if it is numeric
+            if(getNumericArgument(argv, &id, 2))
+                    return -1;
 
-            id = atoi(argv[2]);
             sprintf(instruction,"%d\n%d\n%d\n", REMOVE, id, processPID);
             break;
         
         case INFO:
+            //get identifier argument and check if it is numeric
+            if(getNumericArgument(argv, &id, 2))
+                    return -1;
 
-            id = atoi(argv[2]);
             sprintf(instruction,"%d\n%d\n%d\n", INFO, id, processPID);
             break;
         
         case PRINT:
+            //get identifier argument and check if it is numeric
+            if(getNumericArgument(argv, &id, 2))
+                    return -1;
 
-            id = atoi(argv[2]);
             sprintf(instruction,"%d\n%d\n%d\n", PRINT, id, processPID);
             break;
         
