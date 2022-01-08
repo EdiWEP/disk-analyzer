@@ -171,25 +171,26 @@ void commandHandler(int signal) {
     int code;
     fscanf(fpi, "%d", &code);
     
+    char id[3];
+    char path[512];
+    int callerPid;
+
     switch(code) {
 
         case ADD: 
 
             FILE* outfp = fopen(DAEMON_OUTPUT_PATH, "w");
 
-            char id[3];
-            char path[512];
             char prio[3];
             int pr;
-            int callerPid;
+
+            int newId = firstFreeId();
 
             sprintf(id, "%d", newId);
             fscanf(fpi, "%d", &pr);
             sprintf(prio, "%d", pr);
             fscanf(fpi, "%s", path);
             fscanf(fpi, "%d", &callerPid);
-
-            int newId = firstFreeId();
 
             if(newId == -1) {
                 fprintf(outfp, "Error: Couldn't start new job.\nReason: Maximum amount(%d) of jobs reached.\nUse -r to remove jobs.", MAX_TASKS);
