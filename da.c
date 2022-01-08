@@ -9,6 +9,8 @@
 #include <stdarg.h>
 #include <sys/mman.h>
 #include <stdbool.h>
+#include <errno.h>
+#include <sys/stat.h>
 
 #include "da_variables.h"
 
@@ -23,12 +25,53 @@ int getDaemonPid()
     int d_pid;
     FILE* fptr = fopen(DAEMON_PID_PATH, "r");
     if(fptr == NULL){
-        fprintf(stderr, "Error: Could not open Daemon Pid file\n");
+        fprintf(stderr,"Error: Couldn't open the Daemon PID file\n");
         return -1;
     }
     fscanf(fptr, "%d", &d_pid);
     fclose(fptr);
     return d_pid;
+}
+
+struct stat sts;
+int getDaemonExistence(){
+    char daemon[32];
+
+    int pid = getDaemonPid();
+    if(pid == -1){
+        //proces doesnt exist
+        return 0;
+    }
+
+    sprintf(daemon,"/proc/%d",pid); 
+
+    if(stat(daemon,&sts)== -1 && errno == ENOENT){
+        //process doesnt exist
+        return 0;
+    }
+    //process exists
+    return 1;
+}
+
+int startDaemon(){
+    char *argv[] = {"./dad",NULL};
+
+    if(getDaemonExistence() == 0){
+        //launch daemon
+        int pid = fork();
+
+        if(pid == 0){
+            if(execvp("./dad",argv) == -1){
+                perror(NULL);
+                return errno;
+            };
+        }
+        printf("Daemon Launched\n");
+    }
+    else {
+        printf("Daemon is already running\n");
+    }
+    return 0;
 }
 
 int getOption(char* opt, int argc)
@@ -41,6 +84,7 @@ int getOption(char* opt, int argc)
     else if( strcmp(opt,"-i") == 0 || strcmp(opt,"--info") == 0 ) return INFO;
     else if( strcmp(opt,"-p") == 0 || strcmp(opt,"--print") == 0) return PRINT;
     else if( strcmp(opt,"-l") == 0 || strcmp(opt,"--list") == 0) return LIST_ALL;
+    else if( strcmp(opt, "start") == 0) return START;
     else if (strcmp(opt,"-h") == 0 || strcmp(opt,"--help") == 0) return HELP;
     return -1;
 }
@@ -107,10 +151,8 @@ void getResponse(int signal) {
 }
 
 void initialize() {
-
     daemonPID = getDaemonPid();
     processPID = getpid();
-
     signal(SIGUSR1, getResponse);
 }
 
@@ -124,11 +166,20 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Error: Unknown command.\nUse da -h for usage details\n");
     }
 
-    initialize();
-
     int id;
 
     int option = getOption(argv[1], argc);
+
+    if(option == START){
+        if(startDaemon() != 0){
+            perror(NULL);
+            return errno;
+        }
+        return 0;
+    }
+
+
+    initialize();
 
     switch (option)
     {
@@ -212,11 +263,14 @@ int main(int argc, char *argv[])
             sprintf(instruction,"%d\n%d\n", LIST_ALL, processPID);
             break;
 
+        default:
+            fprintf(stderr, "Error: Invalid instruction\n");
+            option = HELP;
         case HELP:
-
             printf(
                 "Usage: da [OPTION]... [DIR]...\n"
-                "Analyze the space occupied by the directory at [DIR]\n\n"
+                "Analyze the space occupied by the directory at [DIR]\n"
+                "Use 'da start' to launch the Disk Analyzer Daemon\n\n"
                 "-a, --add analyze a new directory path for disk usage\n"
                 "-p, --priority set priority for the new analysis (works only with -a argument)\n"
                 "-S, --suspend <id> suspend task with <id>\n"
@@ -226,12 +280,10 @@ int main(int argc, char *argv[])
                 "-l, --list list all analysis tasks, with their ID and the corresponding root path\n"
                 "-p, --print <id> print analysis report for those tasks that are done\n"
             );
-
-        default:
-            fprintf(stderr, "Error: Invalid instruction\n");
+            break;
         }
-    
-    sendCommand();
+    if(option != HELP)
+        sendCommand();
 
     return 0;
 }
