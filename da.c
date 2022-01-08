@@ -144,8 +144,10 @@ void getResponse(int signal) {
         while(fread(line, 1, 1024, fp)) {
             printf("%s\n", line);
         }
+        
     }
-
+    fclose(fp);
+    
     exit(0);
 
 }
