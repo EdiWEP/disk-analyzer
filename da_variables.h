@@ -3,6 +3,7 @@
 #define LOG_PATH "/tmp/dad/log.txt"
 #define ERROR_LOG_PATH "/tmp/dad/errorlog.txt"
 #define INSTRUCTION_PATH "/tmp/dad/daemon_instructions.txt"
+#define DISKANALYZER_JOB_PATH "/usr/local/bin/diskanalyzer_job"
 #define JOBS_FOLDER_PATH "/tmp/dad/jobs/"
 #define STATUS_FOLDER_PATH "/tmp/dad/status/"
 

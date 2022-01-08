@@ -7,6 +7,8 @@
 #include <error.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <sys/mman.h>
+#include <stdbool.h>
 
 #include "da_variables.h"
 
@@ -45,12 +47,13 @@ int getOption(char* opt, int argc)
 
 int sendCommand() {
 
-    FILE* fptr = fopen(INSTRUCTION_PATH, "w");
-    if(fptr == NULL){
+    FILE* fp = fopen(INSTRUCTION_PATH, "w");
+    if(fp == NULL){
         fprintf(stderr, "Error: Could not open Instruction file\n");
         exit(-1);
     }
-    fprintf(fptr, instruction, NULL);
+    fprintf(fp, instruction, NULL);
+    fclose(fp);
 
     int result = kill(daemonPID, SIGUSR1);
     
@@ -59,7 +62,48 @@ int sendCommand() {
         exit(-1);
     }
 
+    sleep(3); // wait for daemon signal;
+
     return 0;
+}
+
+void getResponse(int signal) {
+
+    int responseCode;
+    bool readJob = false;
+    char line[1024];
+
+    FILE* fp = fopen(DAEMON_OUTPUT_PATH, "r");
+    fscanf(fp, "%d", &responseCode);
+
+    if(responseCode > 0) {
+        readJob = true;
+    }
+
+    if(readJob) {
+        fclose(fp);
+        char outputPath[32];
+        char code[5];
+        sprintf(code, "%d", responseCode);
+
+        strcpy(outputPath, JOBS_FOLDER_PATH);
+        strcat(outputPath, code);
+        strcat(outputPath, ".txt");
+
+        fp = fopen(outputPath, "r");
+
+        while(fread(line, 1, 1024, fp)) {
+            printf("%s\n", line);
+        }
+    }
+    else {
+        while(fread(line, 1, 1024, fp)) {
+            printf("%s\n", line);
+        }
+    }
+
+    exit(0);
+
 }
 
 void initialize() {
@@ -67,6 +111,7 @@ void initialize() {
     daemonPID = getDaemonPid();
     processPID = getpid();
 
+    signal(SIGUSR1, getResponse);
 }
 
 int main(int argc, char *argv[])

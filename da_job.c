@@ -22,8 +22,6 @@ char outputPath[32];
 char statusPath[32];
 
 
-
-
 int rootLength;
 int totalFiles = 0;
 int totalDirectories = 0;
@@ -97,6 +95,7 @@ int analyze(const char* fpath, const struct stat* sb, int typeflag, struct FTW* 
             strcpy(path, fpath);
             countersInitialized = true;
             strcpy(STATUS, "IN PROGRESS");
+
         }
         else{
             int j = 0;
@@ -129,6 +128,7 @@ int analyze(const char* fpath, const struct stat* sb, int typeflag, struct FTW* 
 
         doneDirectories +=1;
         outputDirectory(ftwbuf->level);
+  
     }
     else if(typeflag == FTW_F){
         doneFiles += 1;
@@ -151,6 +151,9 @@ void sendStatus(int sig) {
 
 void initialize(char* argv[]) {
 
+    int priorityIncrement = atoi(argv[3]) - 1;
+    nice(priorityIncrement);
+    
     strcpy(STATUS, "PREPARING");
     signal(SIGUSR2, sendStatus);
     workerId = atoi(argv[2]);
@@ -165,18 +168,18 @@ void initialize(char* argv[]) {
     strcat(base, argv[2]);
     strcpy(statusPath, base);
     strcat(statusPath, ".txt");
-    
+        
     FILE* fp = fopen(DAEMON_PID_PATH, "r");
-    fscanf(fp, "%d", daemonPID);
+    fscanf(fp, "%d", &daemonPID);
     fclose(fp);
-
+    
     fp = fopen(outputPath, "w");
-    fclose(fp);
+    fclose(fp); 
 }
 
 int main(int argc, char* argv[]) {
 
-    if(argc != 3) exit(0);
+    if(argc != 4) exit(0);
 
     initialize(argv);
 

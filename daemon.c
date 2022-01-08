@@ -6,11 +6,29 @@
 #include <sys/stat.h>
 #include <syslog.h>
 #include <fcntl.h>
+#include <sys/mman.h>
+#include <string.h>
 
 #include "da_variables.h"
 
-FILE* logfp;
+#define MAX_TASKS 10
 
+int activeWorkers = 0;
+
+FILE* logfp;
+int workerShmFd;
+void* workerData;
+// 1b[status]1b[percent]4b[totalFiles]4b[totalDirs] | next job | ...
+
+char** status; 
+char** progress;
+int** totalFiles;
+int** totalDirectories;
+// job statuses
+// i -> preparing / initialization stage
+// r -> in progress / running
+// d -> done
+// s -> suspended
 
 void becomeDaemon() {
     pid_t pid;
@@ -71,7 +89,7 @@ void makeDirectories() {
 void printPid() {
     FILE* fp = fopen(DAEMON_PID_PATH, "w");
 
-    fprintf(fp, "%d", getpid());
+    fprintf(fp, "%d\n", getpid());
 
     fclose(fp);
 }
@@ -84,13 +102,53 @@ void openLogs() {
 
     logfp = fopen(LOG_PATH, "w");
 }
-
 void stop(int signal) {
 
     fclose(logfp);
     exit(0);
 }
 
+void setupSharedMem() {
+    workerShmFd = shm_open("dskanl_shm", O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
+
+    if (workerShmFd < 0) {
+        fprintf(stderr, "Error: Failed to open shared memory");
+        stop(0);
+    }
+
+    if(ftruncate(workerShmFd, getpagesize()) == -1) {
+        fprintf(stderr, "Error: Failed to resize shared memory");
+        stop(0); 
+    } 
+
+    void* workerData = mmap(0, getpagesize(), PROT_READ | PROT_WRITE, MAP_SHARED, workerShmFd, 0);
+
+    if(workerData == MAP_FAILED){
+        fprintf(stderr, "Error: Failed to get memory map of worker data");
+        stop(0);
+    }
+
+    status = malloc(sizeof(char*) * (MAX_TASKS+1));
+    progress = malloc(sizeof(char*) * (MAX_TASKS+1));
+    totalFiles = malloc(sizeof(int*) * (MAX_TASKS+1));
+    totalDirectories = malloc(sizeof(char*) * (MAX_TASKS+1)); 
+
+
+    for(int i = 1; i <= MAX_TASKS; ++i) {
+        status[i] = (char*) (workerData + (i-1)*10);
+        progress[i] = (char*) (workerData + (i-1)*10 +1);
+        totalFiles[i] = (int*) (workerData + (i-1)*10 + 2);
+        totalDirectories[i] = (int*) (workerData + (i-1)*10 + 6);
+         
+    }
+}
+
+
+
+int firstFreeId(){
+
+    return 1;
+}
 
 void commandHandler(int signal) {
 
@@ -102,6 +160,43 @@ void commandHandler(int signal) {
     switch(code) {
 
         case ADD: 
+
+            int newId = firstFreeId();
+
+            if(newId > MAX_TASKS) {
+                // output an error
+            }
+
+            char id[3];
+            char path[512];
+            char prio[3];
+            int pr;
+            int callerPid;
+
+            sprintf(id, "%d", newId);
+            fscanf(fpi, "%d", &pr);
+            sprintf(prio, "%d", pr);
+            fscanf(fpi, "%s", path);
+            fscanf(fpi, "%d", &callerPid);
+
+            ++activeWorkers;
+            *status[newId] = 'i';
+            *progress[newId] = 0;
+            *totalFiles[newId] = 0;
+            *totalDirectories[newId] = 0;     
+
+            char* argv[] = {"diskanalyzer_job", path, id, prio, NULL};
+            int pid = fork();
+
+            if(pid == 0) {
+                execve(DISKANALYZER_JOB_PATH, argv, NULL);
+            }
+
+            FILE* outfp = fopen(DAEMON_OUTPUT_PATH, "w");
+            fprintf(outfp, "0\nStarted new analysis job\nID = %d\nDirectory = %s\n", newId, path);
+            fclose(outfp);
+
+            kill(callerPid, SIGUSR1); 
 
         break;
 
@@ -134,7 +229,6 @@ void commandHandler(int signal) {
         break;
     } 
 
-    fclose(fp);
     fclose(fpi);
 }
 
@@ -151,8 +245,10 @@ void initialize() {
     becomeDaemon();
     openLogs();
     setupSignals();
+    setupSharedMem();
     makeDirectories();
     printPid();
+
 }
 
 
