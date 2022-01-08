@@ -185,11 +185,6 @@ int main(int argc, char *argv[])
     {
         case ADD:
             
-            if(argc < 3){
-                fprintf(stderr, "Error: Not enough arguments\n");
-                return -1;
-            }
-
             int priority = 1;
             char* dirPath = argv[2];
             
@@ -205,60 +200,36 @@ int main(int argc, char *argv[])
             break;
 
         case SUSPEND:
-            if(argc != 3){
-                fprintf(stderr, "Error: Wrong number of arguments\n");
-                return -1;
-            }
 
             id = atoi(argv[2]);
             sprintf(instruction,"%d\n%d\n%d\n", SUSPEND, id, processPID);
             break;
 
         case RESUME:
-            if(argc != 3){
-                fprintf(stderr, "Error: Wrong number of arguments\n");
-                return -1;
-            }
-
+           
             id = atoi(argv[2]);
             sprintf(instruction,"%d\n%d\n%d\n", RESUME, id, processPID);
             break;
         
         case REMOVE:
-            if(argc!=3){
-                fprintf(stderr, "Error: Wrong number of arguments\n");
-                return -1;
-            }
 
             id = atoi(argv[2]);
             sprintf(instruction,"%d\n%d\n%d\n", REMOVE, id, processPID);
             break;
         
         case INFO:
-            if(argc!=3){
-                fprintf(stderr, "Error: Wrong number of arguments\n");
-                return -1;
-            }
 
             id = atoi(argv[2]);
             sprintf(instruction,"%d\n%d\n%d\n", INFO, id, processPID);
             break;
         
         case PRINT:
-            if(argc!=3){
-                fprintf(stderr, "Error: Wrong number of arguments\n");
-                return -1;
-            }
 
             id = atoi(argv[2]);
             sprintf(instruction,"%d\n%d\n%d\n", PRINT, id, processPID);
             break;
         
         case LIST_ALL:
-            if(argc != 2){
-                fprintf(stderr, "Error: Wrong number of arguments\n");
-                return -1;
-            }
 
             sprintf(instruction,"%d\n%d\n", LIST_ALL, processPID);
             break;
