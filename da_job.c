@@ -148,7 +148,7 @@ void initialize(char* argv[]) {
     workerId = atoi(argv[2]);
 
     //initialize shared memory
-    workerShmFd = shm_open("dskanl_shm", O_RDWR, S_IRUSR | S_IWUSR);
+    workerShmFd = shm_open(WORKER_SHM_NAME, O_RDWR, S_IRUSR | S_IWUSR);
     workerData = mmap(0, getpagesize(), PROT_READ | PROT_WRITE, MAP_SHARED, workerShmFd, 0);
     statusShm = (char*) (workerData + (workerId - 1)*10); 
     progressShm = (char*) (workerData + (workerId - 1)*10 +1);
