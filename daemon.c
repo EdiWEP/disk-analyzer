@@ -155,10 +155,9 @@ void setupSharedMem() {
 
 int firstFreeId(){
 
-    int newId;
     for(int i = 1; i <= MAX_TASKS; ++i) {
         if(!active[i]) {
-            return newId; 
+            return i; 
         }
     }
 
