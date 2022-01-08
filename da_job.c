@@ -1,32 +1,29 @@
 #define _XOPEN_SOURCE 500
 
-#include<stdlib.h>
-#include<stdio.h>
-#include<unistd.h>
-#include<ftw.h>
-#include<sys/stat.h>
-#include<sys/types.h>
-#include<string.h>
-#include<signal.h>
-#include<stdbool.h>
-
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <ftw.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <string.h>
+#include <signal.h>
+#include <stdbool.h>
+#include <sys/mman.h>
+#include <fcntl.h>
 #include "da_variables.h"
 
-
-int PROGRESS;
-char STATUS[16];
+char* statusShm; 
+char* progressShm;
+int* currentFilesShm;
+int* currentDirectoriesShm;
 
 int workerId;
-int daemonPID;
 char outputPath[32];
-char statusPath[32];
-
 
 int rootLength;
 int totalFiles = 0;
 int totalDirectories = 0;
-int doneFiles = 0;
-int doneDirectories = 0;
 bool countersInitialized = false;
 
 char type[3];
@@ -86,24 +83,22 @@ int nftwCounter(const char* fpath, const struct stat* sb, int typeflag, struct F
 int analyze(const char* fpath, const struct stat* sb, int typeflag, struct FTW* ftwbuf) {
     
     if(typeflag == FTW_D) {
+
         currentSize = 0;
         nftw(fpath, nftwCounter, 1024, 0);
 
         if(ftwbuf->level == 0){
             totalSize = currentSize;
+            countersInitialized = true;
             rootLength = strlen(fpath);
             strcpy(path, fpath);
-            countersInitialized = true;
-            strcpy(STATUS, "IN PROGRESS");
-
+            *statusShm = 'r';
         }
         else{
             int j = 0;
 
-            for(int i = rootLength; i < strlen(fpath); ++i){
+            for(int i = rootLength; i < strlen(fpath); ++i)
                 path[i - rootLength] = fpath[i];
-            }
-
             path[strlen(fpath) - rootLength] = '\0';
         }
 
@@ -126,55 +121,54 @@ int analyze(const char* fpath, const struct stat* sb, int typeflag, struct FTW* 
             printSize = (double) currentSize / 1073741824;
         }
 
-        doneDirectories +=1;
+        *currentDirectoriesShm += 1;
         outputDirectory(ftwbuf->level);
   
     }
     else if(typeflag == FTW_F){
-        doneFiles += 1;
+        *currentFilesShm += 1;
     }
+
+    int progress = 100 * (*currentFilesShm + *currentDirectoriesShm) / (totalFiles + totalDirectories);
+
+    *progressShm = progress;
 
     return 0;
 }
 
-void sendStatus(int sig) {
-
-    if(countersInitialized) {
-        PROGRESS = 100 * (doneFiles + doneDirectories) / (totalFiles + totalDirectories);
-    }
-    FILE* fp = fopen(statusPath, "w");
-    fprintf(fp, "%s\n %d\n %d\n %d\n", STATUS, PROGRESS, totalFiles, totalDirectories);
-    fclose(fp);
-
-    kill(daemonPID, SIGUSR2);
-}
 
 void initialize(char* argv[]) {
+    int workerShmFd;
+    void* workerData;
 
-    int priorityIncrement = atoi(argv[3]) - 1;
-    nice(priorityIncrement);
-    
-    strcpy(STATUS, "PREPARING");
-    signal(SIGUSR2, sendStatus);
     workerId = atoi(argv[2]);
+
     
+    //initialize shared memory
+    workerShmFd = shm_open("dskanl_shm", O_RDWR, S_IRUSR | S_IWUSR);
+    workerData = mmap(0, getpagesize(), PROT_READ | PROT_WRITE, MAP_SHARED, workerShmFd, 0);
+    statusShm = (char*) (workerData + (workerId - 1)*10); 
+    progressShm = (char*) (workerData + (workerId - 1)*10 +1);
+    currentFilesShm = (int*) (workerData + (workerId - 1)*10 + 2);
+    currentDirectoriesShm = (int*) (workerData + (workerId - 1)*10 + 6);
+    *currentFilesShm = 0;
+    *currentDirectoriesShm = 0;
+
+
+    //set priority
+    int priorityIncrement = 3 - atoi(argv[3]);
+    nice(priorityIncrement);
+
+    //initialize file path and output file
     char base[24]; 
     strcpy(base, JOBS_FOLDER_PATH);
     strcat(base, argv[2]);
     strcpy(outputPath, base);
     strcat(outputPath, ".txt");
-
-    strcpy(base, STATUS_FOLDER_PATH);
-    strcat(base, argv[2]);
-    strcpy(statusPath, base);
-    strcat(statusPath, ".txt");
-        
-    FILE* fp = fopen(DAEMON_PID_PATH, "r");
-    fscanf(fp, "%d", &daemonPID);
-    fclose(fp);
     
-    fp = fopen(outputPath, "w");
+    FILE* fp = fopen(outputPath, "w");
     fclose(fp); 
+
 }
 
 int main(int argc, char* argv[]) {
@@ -184,7 +178,8 @@ int main(int argc, char* argv[]) {
     initialize(argv);
 
     nftw(argv[1], analyze, 1024, 0);
-    strcpy(STATUS, "DONE");
+    
+    *statusShm = 'd';
 
     return 0;
 }
