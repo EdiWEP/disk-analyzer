@@ -22,6 +22,7 @@ int workerShmFd;
 void* workerData;
 // 1b[status]1b[percent]4b[doneFiles]4b[totalDirs] | next job | ...
 
+char* paths[MAX_TASKS+1];
 char** status; 
 char** progress;
 int** doneFiles;
@@ -109,7 +110,7 @@ void stop(int signal) {
     fclose(logfp);
 
     munmap(workerData, getpagesize());
-    close(shm_fd);
+    close(workerShmFd);
     shm_unlink(WORKER_SHM_NAME);
 
     exit(0);
@@ -154,10 +155,9 @@ void setupSharedMem() {
 
 int firstFreeId(){
 
-    int newId;
     for(int i = 1; i <= MAX_TASKS; ++i) {
         if(!active[i]) {
-            return newId; 
+            return i; 
         }
     }
 
@@ -205,7 +205,9 @@ void commandHandler(int signal) {
             *progress[newId] = 0;
             *doneFiles[newId] = 0;
             *doneDirectories[newId] = 0;     
-
+			
+			strcpy(paths[newId], path);
+			
             char* argv[] = {"diskanalyzer_job", path, id, prio, NULL};
             int pid = fork();
 
@@ -219,35 +221,37 @@ void commandHandler(int signal) {
             fclose(outfp);
             kill(callerPid, SIGUSR1); 
 
-        break;
+        	break;
 
         case SUSPEND: 
+        	
 
-        break;
+        	break;
         
         case RESUME: 
 
-        break;
+        	break;
         
         case REMOVE:
 
-        break;
+        	break;
 
         case INFO: 
 
-        break;
+        	break;
 
         case PRINT: 
 
-        break;
+        	break;
         
         case LIST_ALL: 
 
-        break;
+        	break;
         
         default: 
             fprintf(stderr,"Error: received unknown command code\n"); 
-        break;
+            
+        	break;
     } 
 
     fclose(fpi);
@@ -290,4 +294,5 @@ int main()
 
     return 0;
 }
+
 
