@@ -152,7 +152,7 @@ void setupSharedMem() {
 
 
 
-int firstFreeId(){
+int firstFreeId() {
 
     for(int i = 1; i <= MAX_TASKS; ++i) {
         if(!active[i]) {
@@ -161,6 +161,35 @@ int firstFreeId(){
     }
 
     return -1;
+}
+
+int checkPath(char* path) {
+
+    int newPathSize = strlen(path); 
+    int existingSize;
+    for(int i = 1; i <= MAX_TASKS; ++i) {
+
+        if(active[i] == 0) continue;
+        existingSize = strlen(paths[i]);
+        int match = 1;
+        
+        if(newPathSize >= existingSize) {
+
+            for(int j = 0; j < existingSize; ++j) {
+                if(paths[i][j] != path[j]) {
+                    match = 0;
+                    break;
+                }
+            }
+            
+            if (match) {
+                return i;
+            }
+        }
+        
+    }
+
+    return 0;
 }
 
 void commandHandler(int signal) {
@@ -193,12 +222,22 @@ void commandHandler(int signal) {
             fscanf(fpi, "%d", &callerPid);
 
             if(newId == -1) {
-                fprintf(outfp, "Error: Couldn't start new job.\nReason: Maximum amount(%d) of jobs reached.\nUse -r to remove jobs.", MAX_TASKS);
+                fprintf(outfp, "0\nError: Couldn't start new job.\nReason: Maximum amount(%d) of jobs reached.\nUse -r to remove jobs.", MAX_TASKS);
             
                 fclose(outfp);
                 kill(callerPid, SIGUSR1);
                 break;
             }
+
+
+            int result = checkPath(path);
+            if(result) {
+                fprintf(outfp, "0\nError: Couldn't start new job.\nReason: Directory already included in job with id %d on %s\n", result, paths[result]);
+            
+                fclose(outfp);
+                kill(callerPid, SIGUSR1);
+                break;
+            } 
 
             ++activeWorkers;
             active[newId] = 1;
