@@ -174,6 +174,7 @@ void commandHandler(int signal) {
     char id[3];
     char path[512];
     int callerPid;
+    int idProcess;
 
     switch(code) {
 
@@ -225,27 +226,37 @@ void commandHandler(int signal) {
         	break;
 
         case SUSPEND: 
-        	
+            fscanf(fpi, "%d", &idProcess);
+        	fscanf(fpi, "%d", &callerPid);
 
         	break;
         
         case RESUME: 
+            fscanf(fpi, "%d", &idProcess);
+        	fscanf(fpi, "%d", &callerPid);
 
         	break;
         
         case REMOVE:
+            fscanf(fpi, "%d", &idProcess);
+        	fscanf(fpi, "%d", &callerPid);
 
         	break;
 
         case INFO: 
+            fscanf(fpi, "%d", &idProcess);
+        	fscanf(fpi, "%d", &callerPid);
 
         	break;
 
         case PRINT: 
+            fscanf(fpi, "%d", &idProcess);
+        	fscanf(fpi, "%d", &callerPid);
 
         	break;
         
         case LIST_ALL: 
+        	fscanf(fpi, "%d", &callerPid);
 
         	break;
         
