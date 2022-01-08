@@ -207,6 +207,7 @@ void commandHandler(int signal) {
             *doneFiles[newId] = 0;
             *doneDirectories[newId] = 0;     
 			
+            paths[newId] = malloc(sizeof(char)*strlen(path));
 			strcpy(paths[newId], path);
 			
             char* argv[] = {"diskanalyzer_job", path, id, prio, NULL};
