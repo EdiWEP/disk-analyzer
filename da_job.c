@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include "da_variables.h"
 
+void* workerData;
 char* statusShm; 
 char* progressShm;
 int* currentFilesShm;
@@ -22,8 +23,8 @@ int workerId;
 char outputPath[32];
 
 int rootLength;
-int totalFiles = 0;
-int totalDirectories = 0;
+int totalFiles;
+int totalDirectories;
 bool countersInitialized = false;
 
 char type[3];
@@ -136,14 +137,16 @@ int analyze(const char* fpath, const struct stat* sb, int typeflag, struct FTW* 
     return 0;
 }
 
+void sigterm_handler(int signum){
+    munmap(workerData, getpagesize());
+    exit(0);
+}
 
 void initialize(char* argv[]) {
     int workerShmFd;
-    void* workerData;
 
     workerId = atoi(argv[2]);
 
-    
     //initialize shared memory
     workerShmFd = shm_open("dskanl_shm", O_RDWR, S_IRUSR | S_IWUSR);
     workerData = mmap(0, getpagesize(), PROT_READ | PROT_WRITE, MAP_SHARED, workerShmFd, 0);
@@ -154,10 +157,12 @@ void initialize(char* argv[]) {
     *currentFilesShm = 0;
     *currentDirectoriesShm = 0;
 
-
     //set priority
     int priorityIncrement = 3 - atoi(argv[3]);
     nice(priorityIncrement);
+
+    //set exit signal
+    signal(SIGTERM, sigterm_handler);
 
     //initialize file path and output file
     char base[24]; 
