@@ -20,6 +20,7 @@ int jobPid[MAX_TASKS+1];
 char previousStatus[MAX_TASKS+1];
 char* paths[MAX_TASKS+1];
 
+
 FILE* logfp;
 int workerShmFd;
 void* workerData;
@@ -207,6 +208,8 @@ void commandHandler(int signal) {
     char path[512];
     int callerPid;
     int processId;
+    char statusWord[16];
+    char currentStatus;
 
     switch(code) {
 
@@ -227,9 +230,6 @@ void commandHandler(int signal) {
 
             if(newId == -1) {
                 fprintf(outfp, "0\nError: Couldn't start new job.\nReason: Maximum amount(%d) of jobs reached.\nUse -r to remove jobs.", MAX_TASKS);
-            
-                fclose(outfp);
-                kill(callerPid, SIGUSR1);
                 break;
             }
 
@@ -237,14 +237,12 @@ void commandHandler(int signal) {
             int result = checkPath(path);
             if(result) {
                 fprintf(outfp, "0\nError: Couldn't start new job.\nReason: Directory already included in job with id %d on %s\n", result, paths[result]);
-            
-                fclose(outfp);
-                kill(callerPid, SIGUSR1);
                 break;
             } 
 
             ++activeWorkers;
             active[newId] = 1;
+            priorities[newId] = pr;
             *status[newId] = 'i';
             *progress[newId] = 0;
             *doneFiles[newId] = 0;
@@ -252,27 +250,31 @@ void commandHandler(int signal) {
 			
             paths[newId] = malloc(sizeof(char)*strlen(path));
 			strcpy(paths[newId], path);
+
 			
             char* argv[] = {"diskanalyzer_job", path, id, prio, NULL};
             int pid = fork();
 
             if(pid == 0) {
                 execve(DISKANALYZER_JOB_PATH, argv, NULL);
+            } else {
+                jobPid[newId] = pid;
             }
-
 
             fprintf(outfp, "0\nStarted new analysis job\nID = %d\nDirectory = %s\n", newId, path);
             
-            fclose(outfp);
-            kill(callerPid, SIGUSR1); 
 
-        	break;
+        break;
 
         case SUSPEND: 
+
+            outfp = fopen(DAEMON_OUTPUT_PATH, "w");
+            
             fscanf(fpi, "%d", &processId);
         	fscanf(fpi, "%d", &callerPid);
 
-            if(active[processId] == 0){
+
+            if(processId > MAX_TASKS || active[processId] == 0){
                 fprintf(outfp, "0\nError: The job doesn't exist\n");
                
                 break;
@@ -284,18 +286,27 @@ void commandHandler(int signal) {
                 break;
             }
 
-            fprintf(outfp, "0\nJob suspended successfully\nID = %d\nDirectory = %s\n", processId, paths[processId]);
+            if(*status[processId] == 'd'){
+                fprintf(outfp, "0\nError: The job is already done\n");
 
+                break;
+            }
+
+            previousStatus[processId] = *status[processId];
             *status[processId] = 's';
-            kill(SIGSTOP, jobPid[processId]);
-
-        	break;
+            kill(jobPid[processId], SIGSTOP);
+            fprintf(outfp, "0\nJob suspended successfully\nID = %d\nDirectory = %s\n", processId, paths[processId]);
+            
+        break;
         
         case RESUME: 
+
+            outfp = fopen(DAEMON_OUTPUT_PATH, "w");
+
             fscanf(fpi, "%d", &processId);
         	fscanf(fpi, "%d", &callerPid);
 
-            if(active[processId] == 0){
+            if(processId > MAX_TASKS || active[processId] == 0){
                 fprintf(outfp, "0\nError: The job doesn't exist\n");
                
                 break;
@@ -306,55 +317,110 @@ void commandHandler(int signal) {
 
                 break;
             }
-
+            
+            *status[processId] = previousStatus[processId];
+            kill(jobPid[processId], SIGCONT);
             fprintf(outfp, "0\nJob resumed successfully\nID = %d\nDirectory = %s\n", processId, paths[processId]);
 
-            *status[processId] = previousStatus[processId];
-            kill(SIGCONT, jobPid[processId]);
-
-        	break;
+        break;
         
         case REMOVE:
+
+            outfp = fopen(DAEMON_OUTPUT_PATH, "w");
+
             fscanf(fpi, "%d", &processId);
         	fscanf(fpi, "%d", &callerPid);
 
-            if(active[processId] == 0){
+            if(processId > MAX_TASKS || active[processId] == 0){
                 fprintf(outfp, "0\nError: The job doesn't exist\n");
                
                 break;
             }
-
-            char statusWord[16];
-            char currentStatus = *status[processId];
+            
+            int switchFail = 0;
+            statusWord[16];
+            currentStatus = *status[processId];
 
             switch (currentStatus){
                 case 'i': strcpy(statusWord, "PREPARING"); break;
-
                 case 'r': strcpy(statusWord, "IN PROGRESS"); break;
-
                 case 'd': strcpy(statusWord, "DONE"); break;
-
                 case 's': strcpy(statusWord, "SUSPENDED"); break;
-                }
+                default: 
+                    fprintf(outfp, "0\nError: Unknown job status.\n");
+                    switchFail = 1;
+                break;
+            }
 
+            if(switchFail) {
+                break;
+            }
+
+            active[processId] = 0;
+            kill(jobPid[processId], SIGTERM);
             fprintf(outfp, "0\nJob removed successfully\nID = %d\nDirectory = %s\nStatus = %s\n", processId, paths[processId], statusWord);
             
-            active[processId] == 0;
-            kill(SIGTERM, jobPid[processId]);
-
-        	break;
+        break;
 
         case INFO: 
+
+            outfp = fopen(DAEMON_OUTPUT_PATH, "w");
+
             fscanf(fpi, "%d", &processId);
         	fscanf(fpi, "%d", &callerPid);
 
-        	break;
+            if(processId > MAX_TASKS || active[processId] == 0){
+                fprintf(outfp, "0\nError: The job doesn't exist.\n");
+                break;
+            }
+
+            currentStatus = *status[processId];
+            statusWord[16];
+            char priority[4];
+            char percentage = *progress[processId];
+            int fileNumber = *doneFiles[processId];
+            int dirNumber = *doneDirectories[processId];
+            
+            int switchFail = 0;
+
+            switch(priorities[processId]) {
+                case 1: strcpy(priority,"*"); break;
+                case 2: strcpy(priority,"**"); break;
+                case 3: strcpy(priority,"***"); break;
+                default: break;
+            }
+
+            switch (currentStatus){
+
+                case 'i': strcpy(statusWord, "PREPARING"); break;
+                case 'r': strcpy(statusWord, "IN PROGRESS"); break;
+                case 'd': strcpy(statusWord, "DONE"); break;
+                case 's': strcpy(statusWord, "SUSPENDED"); break;
+                default: 
+                    fprintf(outfp, "0\nError: Unknown job status.\n");
+                    switchFail = 1;
+
+                break;
+            }
+
+            if(switchFail) {
+                break;
+            }
+
+            fprintf(outfp,"0\nJob %d | %s | %s -> %d%%", processId, priority, paths[processId], percentage); 
+            fprintf(outfp," %s \t %d files %d directories\n", statusWord, fileNumber, dirNumber);
+
+
+        break;
 
         case PRINT: 
+
+            outfp = fopen(DAEMON_OUTPUT_PATH, "w");
+            
             fscanf(fpi, "%d", &processId);
         	fscanf(fpi, "%d", &callerPid);
 
-            if(active[processId] == 0){
+            if(processId > MAX_TASKS || active[processId] == 0){
                 fprintf(outfp, "0\nError: The job doesn't exist\n");
                
                 break;
@@ -368,19 +434,83 @@ void commandHandler(int signal) {
 
             fprintf(outfp, "%d", processId);
 
-        	break;
+        break;
         
         case LIST_ALL: 
+        	outfp = fopen(DAEMON_OUTPUT_PATH, "w");
+
         	fscanf(fpi, "%d", &callerPid);
 
-        	break;
+            int noJobs = 1;
+            for(int i = 1; i <= MAX_TASKS; ++i) {
+                if (active[i]) {
+                    noJobs = 0;
+                    break;
+                } 
+            }
+
+            if(noJobs) {
+                fprintf(outfp, "0\nError: There are no jobs\n");
+                break;
+            }
+
+            fprintf(outfp,"0\n- Job | Prio |  Path  | Done% | Status |    \t \t Details -\n");
+            
+            for(processId = 1; processId <= MAX_TASKS; ++processId) {
+                
+                if(active[processId] == 0){
+                    continue;
+                }
+
+
+                currentStatus = *status[processId];
+                statusWord[16];
+                char priority[4];
+                char percentage = *progress[processId];
+                int fileNumber = *doneFiles[processId];
+                int dirNumber = *doneDirectories[processId];
+                
+                int switchFail = 0;
+
+                switch(priorities[processId]) {
+                    case 1: strcpy(priority,"*"); break;
+                    case 2: strcpy(priority,"**"); break;
+                    case 3: strcpy(priority,"***"); break;
+                    default: break;
+                }
+
+                switch (currentStatus){
+
+                    case 'i': strcpy(statusWord, "PREPARING"); break;
+                    case 'r': strcpy(statusWord, "IN PROGRESS"); break;
+                    case 'd': strcpy(statusWord, "DONE"); break;
+                    case 's': strcpy(statusWord, "SUSPENDED"); break;
+                    default: 
+                        fprintf(outfp, "Error: Unknown job status.\n");
+                        switchFail = 1;
+
+                    break;
+                }
+
+                if(switchFail) {
+                    break;
+                }
+
+                fprintf(outfp,"Job %d | %s | %s -> %d%%", processId, priority, paths[processId], percentage); 
+                fprintf(outfp," %s \t %d files %d directories\n", statusWord, fileNumber, dirNumber);
+                fprintf(outfp,"\n");
+            }
+
+        break;
         
         default: 
             fprintf(stderr,"Error: received unknown command code\n"); 
             
-        	break;
+        break;
     } 
 
+    fclose(outfp);
+    kill(callerPid, SIGUSR1);
     fclose(fpi);
 }
 
