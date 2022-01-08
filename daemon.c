@@ -15,6 +15,9 @@
 
 int activeWorkers = 0;
 int active[MAX_TASKS+1];
+int priorities[MAX_TASKS+1];
+int jobPid[MAX_TASKS+1];
+char previousStatus[MAX_TASKS+1];
 char* paths[MAX_TASKS+1];
 
 FILE* logfp;
@@ -195,7 +198,8 @@ int checkPath(char* path) {
 void commandHandler(int signal) {
 
     FILE* fpi = fopen(INSTRUCTION_PATH, "r");
-    
+    FILE* outfp;
+
     int code;
     fscanf(fpi, "%d", &code);
     
@@ -208,7 +212,7 @@ void commandHandler(int signal) {
 
         case ADD: 
 
-            FILE* outfp = fopen(DAEMON_OUTPUT_PATH, "w");
+            outfp = fopen(DAEMON_OUTPUT_PATH, "w");
 
             char prio[3];
             int pr;
@@ -267,6 +271,21 @@ void commandHandler(int signal) {
         case SUSPEND: 
             fscanf(fpi, "%d", &idProcess);
         	fscanf(fpi, "%d", &callerPid);
+            
+            if(active[idProcess] == 0){
+                fprintf(outfp, "0\nError: The job doesn't exist.\n");
+               
+                break;
+            }
+
+            if(*status[idProcess] == 's'){
+                fprintf(outfp, "0\nError: The job is already suspended.\n");
+
+                break;
+            }
+
+            *status[idProcess] = 's';
+            kill(SIGSTOP, jobPid[idProcess]);
 
         	break;
         
@@ -274,6 +293,20 @@ void commandHandler(int signal) {
             fscanf(fpi, "%d", &idProcess);
         	fscanf(fpi, "%d", &callerPid);
 
+            if(active[idProcess] == 0){
+                fprintf(outfp, "0\nError: The job doesn't exist.\n");
+               
+                break;
+            }
+
+            if(*status[idProcess] != 's'){
+                fprintf(outfp, "0\nError: The job is already executing.\n");
+
+                break;
+            }
+
+            *status[idProcess] = previousStatus[idProcess];
+            kill(SIGCONT, jobPid[idProcess]);
         	break;
         
         case REMOVE:
