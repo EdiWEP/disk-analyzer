@@ -7,35 +7,32 @@
 #include <error.h>
 #include <stdlib.h>
 #include <stdarg.h>
+
 #include "da_variables.h"
 
-int get_daemon_pid()
+
+int daemonPID;
+int processPID;
+char instruction[1024];
+
+
+int getDaemonPid()
 {
     int d_pid;
-    FILE* fptr = fopen(DAEMON_PID_PATH,"r");
+    FILE* fptr = fopen(DAEMON_PID_PATH, "r");
     if(fptr == NULL){
-        printf("Error: Could not open Daemon Pid file");
+        fprintf(stderr, "Error: Could not open Daemon Pid file\n");
         return -1;
     }
-    fscanf(fptr,"%d",&d_pid);
+    fscanf(fptr, "%d", &d_pid);
     fclose(fptr);
     return d_pid;
 }
 
-int write_in_file(const char* data)
-{
-    FILE* fptr = fopen(INSTRUCTION_PATH,"w");
-    if(fptr == NULL){
-        printf("Error: Could not open Instruction Path file");
-        return -1;
-    }
-    fprintf(fptr,data,NULL);
-}
-
-int get_option(char* opt)
+int getOption(char* opt, int argc)
 {
     if( strcmp(opt,"-a") == 0 || strcmp(opt,"--add") == 0 )  return ADD;
-    else if( strcmp(opt,"-p") == 0 || strcmp(opt,"--priority") == 0 ) return PRIORITY;
+    else if( ( strcmp(opt,"-p") == 0 || strcmp(opt,"--priority") == 0 ) && argc == 5) return PRIORITY;
     else if( strcmp(opt,"-S") == 0 || strcmp(opt,"--suspend") == 0 ) return SUSPEND;
     else if( strcmp(opt,"-R") == 0 || strcmp(opt,"--resume") == 0 ) return RESUME;
     else if( strcmp(opt,"-r") == 0 || strcmp(opt,"--remove") == 0 ) return REMOVE;
@@ -46,33 +43,61 @@ int get_option(char* opt)
     return -1;
 }
 
-int main(int argc, char **argv)
-{
-    if(argc == 1){
-        printf("No Arguments\n");
-        return -1;
+int sendCommand() {
+
+    FILE* fptr = fopen(INSTRUCTION_PATH, "w");
+    if(fptr == NULL){
+        fprintf(stderr, "Error: Could not open Instruction file\n");
+        exit(-1);
+    }
+    fprintf(fptr, instruction, NULL);
+
+    int result = kill(daemonPID, SIGUSR1);
+    
+    if (result) {
+        fprintf(stderr, "Error: Failed to send signal to daemon\n");
+        exit(-1);
     }
 
-    pid_t daemon_pid = get_daemon_pid();
-    pid_t process_pid = getpid();
-    int id;
-    char instruction[1000];
+    return 0;
+}
 
-    int option = get_option(argv[1]);
+void initialize() {
+
+    daemonPID = getDaemonPid();
+    processPID = getpid();
+
+}
+
+int main(int argc, char *argv[])
+{
+    if(argc == 1) {
+        fprintf(stderr, "Error: No arguments given.\nUse da -h for usage details\n");
+        return -1;
+    }
+    if(argc == 4 || argc > 5) {
+        fprintf(stderr, "Error: Unknown command.\nUse da -h for usage details\n");
+    }
+
+    initialize();
+
+    int id;
+
+    int option = getOption(argv[1], argc);
 
     switch (option)
     {
         case ADD:
             
             if(argc < 3){
-                printf("Not enough arguments.");
+                fprintf(stderr, "Error: Not enough arguments\n");
                 return -1;
             }
 
             int priority = 1;
             char* dirPath = argv[2];
             
-            if(argc == 5 && get_option(argv[3]) == PRIORITY){
+            if(argc == 5 && getOption(argv[3], argc) == PRIORITY){
 
                 priority = atoi(argv[4]);
                 if(priority > 3) priority = 3;
@@ -80,66 +105,66 @@ int main(int argc, char **argv)
 
             }
 
-            sprintf(instruction,"Instruction - %d\nPriority - %d\nPath - %s\nDA_Pid - %d\n",ADD,priority,dirPath,getpid());
+            sprintf(instruction,"%d\n%d\n%s\n%d\n", ADD, priority, dirPath, processPID);
             break;
 
         case SUSPEND:
             if(argc != 3){
-                printf("Wrong number of arguments.");
+                fprintf(stderr, "Error: Wrong number of arguments\n");
                 return -1;
             }
 
             id = atoi(argv[2]);
-            sprintf(instruction,"Instruction - %d\nId - %d\nDA_Pid - %d\n",SUSPEND,id,getpid());
+            sprintf(instruction,"%d\n%d\n%d\n", SUSPEND, id, processPID);
             break;
 
         case RESUME:
             if(argc != 3){
-                printf("Wrong number of arguments.");
+                fprintf(stderr, "Error: Wrong number of arguments\n");
                 return -1;
             }
 
             id = atoi(argv[2]);
-            sprintf(instruction,"Instruction - %d\nId - %d\nDA_Pid - %d\n",RESUME,id,getpid());
+            sprintf(instruction,"%d\n%d\n%d\n", RESUME, id, processPID);
             break;
         
         case REMOVE:
             if(argc!=3){
-                printf("Wrong number of arguments.");
+                fprintf(stderr, "Error: Wrong number of arguments\n");
                 return -1;
             }
 
             id = atoi(argv[2]);
-            sprintf(instruction,"Instruction - %d\nId - %d\nDA_Pid - %d\n",REMOVE,id,getpid());
+            sprintf(instruction,"%d\n%d\n%d\n", REMOVE, id, processPID);
             break;
         
         case INFO:
             if(argc!=3){
-                printf("Wrong number of arguments.");
+                fprintf(stderr, "Error: Wrong number of arguments\n");
                 return -1;
             }
 
             id = atoi(argv[2]);
-            sprintf(instruction,"Instruction - %d\nId - %d\nDA_Pid - %d\n",INFO,id,getpid());
+            sprintf(instruction,"%d\n%d\n%d\n", INFO, id, processPID);
             break;
         
         case PRINT:
             if(argc!=3){
-                printf("Wrong number of arguments.");
+                fprintf(stderr, "Error: Wrong number of arguments\n");
                 return -1;
             }
 
             id = atoi(argv[2]);
-            sprintf(instruction,"Instruction - %d\nId - %d\nDA_Pid - %d\n",PRINT,id,getpid());
+            sprintf(instruction,"%d\n%d\n%d\n", PRINT, id, processPID);
             break;
         
         case LIST_ALL:
             if(argc != 2){
-                printf("Wrong number of arguments.");
+                fprintf(stderr, "Error: Wrong number of arguments\n");
                 return -1;
             }
 
-            sprintf(instruction,"Instruction - %d\nDA_Pid - %d\n",LIST_ALL,getpid());
+            sprintf(instruction,"%d\n%d\n", LIST_ALL, processPID);
             break;
 
         case HELP:
@@ -158,10 +183,10 @@ int main(int argc, char **argv)
             );
 
         default:
-            printf("Invalid instruction");
+            fprintf(stderr, "Error: Invalid instruction\n");
         }
     
-    write_in_file(instruction);
+    sendCommand();
 
     return 0;
 }

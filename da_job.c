@@ -10,16 +10,27 @@
 #include<signal.h>
 #include<stdbool.h>
 
-int workerId;
-int PROGRESS;
-int daemonPID;
-char STATUS[16];
-char outputPath[64];
-char statusPath[64];
-char daemonPidPath[64];
+#include "da_variables.h"
 
+
+int PROGRESS;
+char STATUS[16];
+
+int workerId;
+int daemonPID;
+char outputPath[32];
+char statusPath[32];
+
+
+
+
+int rootLength;
+int totalFiles = 0;
+int totalDirectories = 0;
+int doneFiles = 0;
+int doneDirectories = 0;
 bool countersInitialized = false;
-int rootLength, totalFiles = 0, totalDirectories = 0, doneFiles = 0, doneDirectories = 0;
+
 char type[3];
 char path[512];
 
@@ -59,7 +70,7 @@ void outputDirectory(int level){
 }
 
 
-int func_count(const char* fpath, const struct stat* sb, int typeflag, struct FTW* ftwbuf) {
+int nftwCounter(const char* fpath, const struct stat* sb, int typeflag, struct FTW* ftwbuf) {
 
     if(typeflag == FTW_F)
         currentSize += sb->st_size;
@@ -74,16 +85,18 @@ int func_count(const char* fpath, const struct stat* sb, int typeflag, struct FT
     return 0;
 }
 
-int func(const char* fpath, const struct stat* sb, int typeflag, struct FTW* ftwbuf) {
+int analyze(const char* fpath, const struct stat* sb, int typeflag, struct FTW* ftwbuf) {
+    
     if(typeflag == FTW_D) {
         currentSize = 0;
-        nftw(fpath, func_count, 1024, 0);
+        nftw(fpath, nftwCounter, 1024, 0);
 
         if(ftwbuf->level == 0){
             totalSize = currentSize;
             rootLength = strlen(fpath);
             strcpy(path, fpath);
             countersInitialized = true;
+            strcpy(STATUS, "IN PROGRESS");
         }
         else{
             int j = 0;
@@ -120,14 +133,17 @@ int func(const char* fpath, const struct stat* sb, int typeflag, struct FTW* ftw
     else if(typeflag == FTW_F){
         doneFiles += 1;
     }
+
     return 0;
 }
 
-void SendStatus(int sig) {
+void sendStatus(int sig) {
 
-    PROGRESS = 100 * (doneFiles + doneDirectories) / (totalFiles + totalDirectories);
+    if(countersInitialized) {
+        PROGRESS = 100 * (doneFiles + doneDirectories) / (totalFiles + totalDirectories);
+    }
     FILE* fp = fopen(statusPath, "w");
-    fprintf(fp, "%s\n, %d", STATUS, PROGRESS);
+    fprintf(fp, "%s\n %d\n %d\n %d\n", STATUS, PROGRESS, totalFiles, totalDirectories);
     fclose(fp);
 
     kill(daemonPID, SIGUSR2);
@@ -136,29 +152,24 @@ void SendStatus(int sig) {
 void initialize(char* argv[]) {
 
     strcpy(STATUS, "PREPARING");
-    signal(SIGUSR2, SendStatus);
+    signal(SIGUSR2, sendStatus);
     workerId = atoi(argv[2]);
     
     char base[24]; 
-    strcpy(base, "/tmp/dad/jobs/");
+    strcpy(base, JOBS_FOLDER_PATH);
     strcat(base, argv[2]);
     strcpy(outputPath, base);
     strcat(outputPath, ".txt");
 
-    strcpy(base, "/tmp/dad/status/");
+    strcpy(base, STATUS_FOLDER_PATH);
     strcat(base, argv[2]);
     strcpy(statusPath, base);
     strcat(statusPath, ".txt");
-
-    strcpy(daemonPidPath, "/tmp/dad/daemon_pid.txt");
-
-    FILE* fp = fopen(daemonPidPath, "r");
-    char* pid = malloc(10);
-    fread(pid, 10, 1, fp);
-    daemonPID = atoi(pid);
-    free(pid);
-    fclose(fp);
     
+    FILE* fp = fopen(DAEMON_PID_PATH, "r");
+    fscanf(fp, "%d", daemonPID);
+    fclose(fp);
+
     fp = fopen(outputPath, "w");
     fclose(fp);
 }
@@ -169,8 +180,7 @@ int main(int argc, char* argv[]) {
 
     initialize(argv);
 
-    strcpy(STATUS, "IN PROGRESS");
-    nftw(argv[1], func, 1024, 0);
+    nftw(argv[1], analyze, 1024, 0);
     strcpy(STATUS, "DONE");
 
     return 0;
