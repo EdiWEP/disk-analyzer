@@ -1,17 +1,14 @@
-//paths
 #define DAEMON_PID_PATH "/tmp/dad/daemon_pid.txt"
 #define DAEMON_OUTPUT_PATH "/tmp/dad/daemon_output.txt"
 #define LOG_PATH "/tmp/dad/log.txt"
 #define ERROR_LOG_PATH "/tmp/dad/errorlog.txt"
 #define INSTRUCTION_PATH "/tmp/dad/daemon_instructions.txt"
-#define DISKANALYZER_JOB_PATH "/usr/local/bin/diskanalyzer_job"
 #define JOBS_FOLDER_PATH "/tmp/dad/jobs/"
-#define STATUS_FOLDER_PATH "/tmp/dad/status/"
+#define DAEMON_BINARY_PATH "/opt/diskanalyzer/dad"
+#define DISKANALYZER_JOB_PATH "/opt/diskanalyzer/diskanalyzer_job"
 
-//shared memory
 #define WORKER_SHM_NAME "dskanl_shm"
 
-//commands
 #define ADD 1
 #define PRIORITY 2
 #define SUSPEND 3

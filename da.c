@@ -25,7 +25,7 @@ int getDaemonPid()
     int d_pid;
     FILE* fptr = fopen(DAEMON_PID_PATH, "r");
     if(fptr == NULL){
-        fprintf(stderr,"Error: Couldn't open the Daemon PID file\n");
+        fprintf(stderr,"Error: Couldn't open the Daemon PID file. Check if daemon is running\nUse da -h for usage details\n");
         return -1;
     }
     fscanf(fptr, "%d", &d_pid);
@@ -53,17 +53,17 @@ int getDaemonExistence(){
     return 1;
 }
 
-int startDaemon(){
-    char *argv[] = {"./dad",NULL};
+void startDaemon(){
+    char *argv[] = {"dad",NULL};
 
     if(getDaemonExistence() == 0){
         //launch daemon
         int pid = fork();
 
         if(pid == 0){
-            if(execvp("./dad",argv) == -1){
-                perror(NULL);
-                return errno;
+            if(execvp(DAEMON_BINARY_PATH, argv) == -1){
+                fprintf(stderr, "Error: Daemon failed to start, errno: %d\n", errno);
+                exit(0);
             };
         }
         printf("Daemon Launched\n");
@@ -71,7 +71,6 @@ int startDaemon(){
     else {
         printf("Daemon is already running\n");
     }
-    return 0;
 }
 
 int getOption(char* opt, int argc)
@@ -102,7 +101,7 @@ int sendCommand() {
     int result = kill(daemonPID, SIGUSR1);
     
     if (result) {
-        fprintf(stderr, "Error: Failed to send signal to daemon\n");
+        fprintf(stderr, "Error: Failed to send signal to daemon. Check if daemon is running\nUse da -h for usage details\n\n");
         exit(-1);
     }
 
@@ -114,10 +113,11 @@ int sendCommand() {
 void getResponse(int signal) {
 
     int responseCode;
-    char line[1024];
+    char c; 
 
     FILE* fp = fopen(DAEMON_OUTPUT_PATH, "r");
     fscanf(fp, "%d", &responseCode);
+    c = fgetc(fp); // skip first \n
 
     if(responseCode > 0) {
         fclose(fp);
@@ -131,14 +131,16 @@ void getResponse(int signal) {
 
         fp = fopen(outputPath, "r");
 
-        while(fread(line, 1, 1024, fp)) {
-            printf("%s\n", line);
+        while(( c = fgetc(fp)) != EOF) {
+            printf("%c",c);
         }
+        
     }
     else {
-        while(fread(line, 1, 1024, fp)) {
-            printf("%s\n", line);
+        while((c=fgetc(fp)) != EOF) {
+            printf("%c",c);
         }
+        
     }
 
     fclose(fp);
@@ -163,9 +165,9 @@ bool getNumericArgument(char *argv[], int *variable, int index){
     //check if argument given is a number
     if(*inputcheck != '\0'){
         if(index == 4)
-            fprintf(stderr, "Error: Priority must be numeric.\n");
+            fprintf(stderr, "Error: Priority must be numeric\n");
         else if(index == 2)
-            fprintf(stderr, "Error: Identifier must be numeric.\n");
+            fprintf(stderr, "Error: Identifier must be numeric\n");
         return -1;
     }
 
@@ -175,11 +177,11 @@ bool getNumericArgument(char *argv[], int *variable, int index){
 int main(int argc, char *argv[])
 {
     if(argc == 1) {
-        fprintf(stderr, "Error: No arguments given.\nUse da -h for usage details\n");
+        fprintf(stderr, "Error: No arguments given\nUse da -h for usage details\n");
         return -1;
     }
     if(argc == 4 || argc > 5) {
-        fprintf(stderr, "Error: Unknown command.\nUse da -h for usage details\n");
+        fprintf(stderr, "Error: Unknown command\nUse da -h for usage details\n");
     }
 
     int id;
@@ -187,10 +189,7 @@ int main(int argc, char *argv[])
     int option = getOption(argv[1], argc);
 
     if(option == START){
-        if(startDaemon() != 0){
-            perror(NULL);
-            return errno;
-        }
+        startDaemon();
         return 0;
     }
 
@@ -205,14 +204,14 @@ int main(int argc, char *argv[])
 
             //check if path was given
             if(argc == 2){
-                fprintf(stderr, "Error: -a requires an argument(path).\n");
+                fprintf(stderr, "Error: -a requires an argument(path)\n");
                 return -1;
             }
 
             //check if path is valid
             DIR* checkDirectory = opendir(dirPath);
             if(ENOENT == errno){
-                fprintf(stderr, "Error: Invalid or inexistent path.\n");
+                fprintf(stderr, "Error: Invalid or inexistent path\n");
                 return -1;
             }
             closedir(checkDirectory);
@@ -226,11 +225,11 @@ int main(int argc, char *argv[])
 
                 if(priority > 3){ 
                     priority = 3;
-                    printf("Warning: Priority was set to maximum of 3.\n");
+                    printf("Warning: Priority was set to maximum of 3\n");
                 }
                 else if (priority < 1){ 
                     priority = 1;
-                    printf("Warning: Priority was set to minimum of 1.\n");
+                    printf("Warning: Priority was set to minimum of 1\n");
                     }
             }
 
@@ -287,21 +286,26 @@ int main(int argc, char *argv[])
             option = HELP;
         case HELP:
             printf(
-                "Usage: da [OPTION]... [DIR]...\n"
-                "Analyze the space occupied by the directory at [DIR]\n"
-                "Use 'da start' to launch the Disk Analyzer Daemon\n\n"
-                "-a, --add analyze a new directory path for disk usage\n"
-                "-p, --priority set priority for the new analysis (works only with -a argument)\n"
-                "-S, --suspend <id> suspend task with <id>\n"
-                "-R, --resume <id> resume task with <id>\n"
-                "-r, --remove <id> remove the analysis with the given <id>\n"
-                "-i, --info <id> print status about the analysis with <id> (pending, progress, done)\n"
-                "-l, --list list all analysis tasks, with their ID and the corresponding root path\n"
-                "-p, --print <id> print analysis report for those tasks that are done\n"
+                "DiskAnalyzer - a daemon that performs and manages disk space analysis jobs\n\n"
+                "USAGE\n\n"
+                "  da start                Launch the daemon. Do this before trying to start a job\n"
+                "  da -a [DIR]             Perform analysis on directory at [DIR]. Absolute path only\n"
+                "  da -a [DIR] -p [1-3]    Set priority of analysis after starting. 3 is highest\n"
+                "  da -l                   List job statuses, including ID and priority\n"
+                "  da [OPTION] [ID]        Send command [OPTION] regarding job with [ID]. [OPTION] must be a flag \n"
+                "\nFLAGS\n\n"
+                "  -a, --add [DIRPATH]     Start new analysis job on directory [DIRPATH]\n"
+                "  -p, --priority [1-3]    Set job priority (only after -a flag)\n"
+                "  -l, --list              Srint status of all jobs\n"
+                "  -i, --info [id]         Print status of job with the given [id]\n"
+                "  -p, --print [id]        Print analysis results of job with the given [id]\n"
+                "  -r, --remove [id]       Remove task with the given [id]\n"
+                "  -S, --suspend [id]      Suspend task with the given [id]\n"
+                "  -R, --resume [id]       Resume task with the given [id]\n"
             );
             break;
         }
-    if(option != HELP)
+    if(option != HELP) 
         sendCommand();
 
     return 0;
