@@ -5,7 +5,7 @@ Multiple analysis tasks with differing priorities can be started at the same tim
 The **da** command-line tool is used to send commands to the daemon.  
 
 ---
-### Installation
+## Installation
 1. Download the *diskanalyzer.tar* archive from this repository
 2. Run the following commands:
 ```bash
@@ -16,7 +16,7 @@ sudo ./da_installer.sh
 4. You can then delete the archive, source files and installer
 
 ---
-### Usage
+## Usage
 Use `da start` to start the daemon, then refer to `da -h` for instructions on sending commands to the daemon.
 
 Flags:
@@ -32,14 +32,14 @@ Flags:
 ```
 
 ---
-### Examples
+## Examples
 
-##### Starting the daemon
+#### Starting the daemon
 ```bash
 da start
 ```
 
-##### Starting a job
+#### Starting a job
 ```bash
 > da -a /home
 
@@ -49,12 +49,12 @@ Directory = /home
 
 ```
 
-##### Printing results of job with id 3
+#### Printing results of job with id 3
 ```bash
 da -p 3
 ```
 
-##### Listing status of all jobs 
+#### Listing status of all jobs 
 ```bash
 > da -l
 
@@ -69,7 +69,7 @@ ID 3 *  /home -> 100% DONE 	 52964 files 6411 directories
 ```
 
 ---
-### Implementation details
+## Implementation details
 This software was written by a team of four students, as a final project for the **Operating Systems** course at the University of Bucharest.
 
 We gained experience in using git as a team and a deeper understanding of daemon functionality, inter-process communication and Unix-like operating systems.
