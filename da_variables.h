@@ -1,3 +1,4 @@
+//paths
 #define DAEMON_PID_PATH "/tmp/dad/daemon_pid.txt"
 #define DAEMON_OUTPUT_PATH "/tmp/dad/daemon_output.txt"
 #define LOG_PATH "/tmp/dad/log.txt"
@@ -7,8 +8,10 @@
 #define JOBS_FOLDER_PATH "/tmp/dad/jobs/"
 #define STATUS_FOLDER_PATH "/tmp/dad/status/"
 
+//shared memory
 #define WORKER_SHM_NAME "dskanl_shm"
 
+//commands
 #define ADD 1
 #define PRIORITY 2
 #define SUSPEND 3
