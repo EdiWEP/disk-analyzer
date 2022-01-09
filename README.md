@@ -58,12 +58,13 @@ da -p 3
 ```bash
 > da -l
 
-- Job | Prio |  Path  | Done% | Status |    	 	 Details -
-Job 1 | ** | /home/aidan -> 100% DONE 	 52964 files 6409 directories
+Job  Prio    Path    Done%   Status       	 	 Details 
 
-Job 2 | * | /usr -> 100% DONE 	 377266 files 39904 directories
+ID 1 **  /home/aidan -> 100% DONE 	 52964 files 6409 directories
 
-Job 3 | * | /home -> 100% DONE 	 52964 files 6411 directories
+ID 2 *  /usr -> 100% DONE 	 377266 files 39904 directories
+
+ID 3 *  /home -> 100% DONE 	 52964 files 6411 directories
 
 ```
 
