@@ -13,11 +13,13 @@
 #include <fcntl.h>
 #include "da_variables.h"
 
+//shared memory variables
 void* workerData;
 char* statusShm; 
 char* progressShm;
 int* currentFilesShm;
 int* currentDirectoriesShm;
+//--
 
 int workerId;
 char outputPath[32];
@@ -36,7 +38,7 @@ unsigned long totalSize;
 unsigned long currentSize;
 
 
-void outputDirectory(int level){
+void outputToFile(int level){
         int i;
 
         FILE* fp = fopen(outputPath, "a");
@@ -47,6 +49,7 @@ void outputDirectory(int level){
 
         fprintf(fp, "%s: %0.2f %s, %0.2f%% ", path, printSize, type, percent);
 
+        //percentage bar output
         fprintf(fp, "[");
         for(i = 1; i <= percent / 4; ++i)
             fprintf(fp, "#");
@@ -59,12 +62,12 @@ void outputDirectory(int level){
                 fprintf(fp, "-");
         }
         fprintf(fp, "]");
+        //--
 
         fprintf(fp, "\n");
 
         fclose(fp);
 }
-
 
 int nftwCounter(const char* fpath, const struct stat* sb, int typeflag, struct FTW* ftwbuf) {
 
@@ -86,18 +89,21 @@ int analyze(const char* fpath, const struct stat* sb, int typeflag, struct FTW* 
     if(typeflag == FTW_D) {
 
         currentSize = 0;
+
+        //compute size of directory
         nftw(fpath, nftwCounter, 1024, 0);
 
+        //if in parent/root directory
         if(ftwbuf->level == 0){
             totalSize = currentSize;
             countersInitialized = true;
             rootLength = strlen(fpath);
             strcpy(path, fpath);
-            *statusShm = 'r';
+            *statusShm = 'r';            //set status to in progress / running
         }
         else{
             int j = 0;
-
+            //get path relative to parent/root directory
             for(int i = rootLength; i < strlen(fpath); ++i)
                 path[i - rootLength] = fpath[i];
             path[strlen(fpath) - rootLength] = '\0';
@@ -105,11 +111,12 @@ int analyze(const char* fpath, const struct stat* sb, int typeflag, struct FTW* 
 
         percent = (double) currentSize / totalSize * 100;
 
+        // 1024 B = 1KB, 1048576 B = 1MB, 1073741824 B = 1GB
         if(currentSize < 1024){
             strcpy(type, "B");
             printSize = currentSize;
         }
-        else if(currentSize < 1048576){
+        else if(currentSize < 1048576){ 
             strcpy(type, "KB");
             printSize = (double) currentSize / 1024;
         }
@@ -123,13 +130,13 @@ int analyze(const char* fpath, const struct stat* sb, int typeflag, struct FTW* 
         }
 
         *currentDirectoriesShm += 1;
-        outputDirectory(ftwbuf->level);
-  
+        outputToFile(ftwbuf->level);
     }
     else if(typeflag == FTW_F){
         *currentFilesShm += 1;
     }
-
+    
+    //write current progress to shared memory
     int progress = 100 * (*currentFilesShm + *currentDirectoriesShm) / (totalFiles + totalDirectories);
 
     *progressShm = progress;
@@ -142,6 +149,7 @@ void sigterm_handler(int signum){
     exit(0);
 }
 
+//initializes required variables and output file
 void initialize(char* argv[]) {
     int workerShmFd;
 
@@ -161,10 +169,10 @@ void initialize(char* argv[]) {
     int priorityIncrement = 3 - atoi(argv[3]);
     nice(priorityIncrement);
 
-    //set exit signal
+    //set SIGTERM handler
     signal(SIGTERM, sigterm_handler);
 
-    //initialize file path and output file
+    //initialize output file path
     char base[24]; 
     strcpy(base, JOBS_FOLDER_PATH);
     strcat(base, argv[2]);
@@ -178,13 +186,15 @@ void initialize(char* argv[]) {
 
 int main(int argc, char* argv[]) {
 
-    if(argc != 4) exit(0);
+    //check number of arguments
+    if(argc != 4) 
+        exit(0);
 
     initialize(argv);
 
-    nftw(argv[1], analyze, 1024, 0);
+    nftw(argv[1], analyze, 1024, 0);     //execute main task
     
-    *statusShm = 'd';
+    *statusShm = 'd';     //set status to Done
 
     return 0;
 }
