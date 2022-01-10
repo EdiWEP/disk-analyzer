@@ -33,10 +33,13 @@ int getDaemonPid()
     return d_pid;
 }
 
-struct stat sts;
 int getDaemonExistence(){
     char daemon[32];
-
+    struct stat sts;
+    if(stat(DAEMON_PID_PATH, &sts) == -1 && errno == ENOENT) {
+        return 0;
+    }  
+    
     int pid = getDaemonPid();
     if(pid == -1){
         //proces doesnt exist
@@ -237,6 +240,11 @@ int main(int argc, char *argv[])
             break;
 
         case SUSPEND:
+            if(argc != 3) {
+                fprintf(stderr, "Error: Wrong number of arguments\nUsage: da [OPTION] [ID]\n");
+                return -1;
+            }
+
             //get identifier argument and check if it is numeric
             if(getNumericArgument(argv, &id, 2))
                     return -1;
@@ -245,6 +253,11 @@ int main(int argc, char *argv[])
             break;
 
         case RESUME:
+            if(argc != 3) {
+                fprintf(stderr, "Error: Wrong number of arguments\nUsage: da [OPTION] [ID]\n");
+                return -1;
+            }
+
            //get identifier argument and check if it is numeric
             if(getNumericArgument(argv, &id, 2))
                     return -1;
@@ -253,6 +266,11 @@ int main(int argc, char *argv[])
             break;
         
         case REMOVE:
+            if(argc != 3) {
+                fprintf(stderr, "Error: Wrong number of arguments\nUsage: da [OPTION] [ID]\n");
+                return -1;
+            }
+
             //get identifier argument and check if it is numeric
             if(getNumericArgument(argv, &id, 2))
                     return -1;
@@ -261,6 +279,11 @@ int main(int argc, char *argv[])
             break;
         
         case INFO:
+            if(argc != 3) {
+                fprintf(stderr, "Error: Wrong number of arguments\nUsage: da [OPTION] [ID]\n");
+                return -1;
+            }
+
             //get identifier argument and check if it is numeric
             if(getNumericArgument(argv, &id, 2))
                     return -1;
@@ -269,6 +292,11 @@ int main(int argc, char *argv[])
             break;
         
         case PRINT:
+            if(argc != 3) {
+                fprintf(stderr, "Error: Wrong number of arguments\nUsage: da [OPTION] [ID]\n");
+                return -1;
+            }
+            
             //get identifier argument and check if it is numeric
             if(getNumericArgument(argv, &id, 2))
                     return -1;
