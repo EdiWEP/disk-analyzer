@@ -4,7 +4,6 @@ A Linux daemon that analyzes used disk space starting from a given path.
 Multiple analysis tasks with differing priorities can be started at the same time. Each analysis task can be suspended, resumed or removed.
 The **da** command-line tool is used to send commands to the daemon.  
 
----
 ## Installation
 1. Download the *diskanalyzer.tar* archive from this repository
 2. Run the following commands:
@@ -15,7 +14,6 @@ sudo ./da_installer.sh
 3. This will compile the source files and move the **da** binary to /usr/local/bin
 4. You can then delete the archive, source files and installer
 
----
 ## Usage
 Use `da start` to start the daemon, then refer to `da -h` for instructions on sending commands to the daemon.
 
@@ -31,7 +29,6 @@ Flags:
  -R, --resume <id>       resume task with the given <id>
 ```
 
----
 ## Examples
 
 #### Starting the daemon
@@ -68,7 +65,6 @@ ID 3 *  /home -> 100% DONE 	 52964 files 6411 directories
 
 ```
 
----
 ## Implementation details
 This software was written by a team of four students, as a final project for the **Operating Systems** course at the University of Bucharest.
 
