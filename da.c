@@ -200,14 +200,13 @@ int main(int argc, char *argv[])
     if(option != HELP) initialize();
 
     int priority = 1;
-
+    char* dirPath; 
     switch (option)
     {
         case ADD:
-            
-            
-            char* dirPath = argv[2];
 
+            dirPath = argv[2];
+            
             //check if path was given
             if(argc == 2){
                 fprintf(stderr, "Error: -a requires an argument(path)\n");
