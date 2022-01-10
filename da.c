@@ -196,13 +196,16 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    initialize();
+    
+    if(option != HELP) initialize();
+
+    int priority = 1;
 
     switch (option)
     {
         case ADD:
             
-            int priority = 1;
+            
             char* dirPath = argv[2];
 
             //check if path was given
