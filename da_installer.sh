@@ -70,6 +70,6 @@ fi
 echo "Executables moved"
 
 echo ""
-echo "DiskInstaller sucessfully installed. You can delete the source code files and this installer"
+echo "DiskAnalyzer sucesssfully installed. You can delete the source code files and this installer"
 echo "You can find the uninstaller at https://github.com/EdiWEP/disk-analyzer"
 echo "Use da --help for usage details"
