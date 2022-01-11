@@ -11,7 +11,7 @@ The **da** command-line tool is used to send commands to the daemon.
 tar xvf diskanalyzer.tar
 sudo ./da_installer.sh
 ```
-3. This will compile the source files and move the **da** binary to /usr/local/bin
+3. This will compile the source files and move the **da** binary to /usr/local/bin, and the daemon and job executables to /opt/diskanalyzer
 4. You can then delete the archive, source files and installer
 
 ## Usage
